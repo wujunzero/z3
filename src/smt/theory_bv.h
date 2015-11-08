@@ -16,8 +16,8 @@ Author:
 Revision History:
 
 --*/
-#ifndef _THEORY_BV_H_
-#define _THEORY_BV_H_
+#ifndef THEORY_BV_H_
+#define THEORY_BV_H_
 
 #include"smt_theory.h"
 #include"theory_bv_params.h"
@@ -236,6 +236,7 @@ namespace smt {
         virtual void pop_scope_eh(unsigned num_scopes);
         virtual final_check_status final_check_eh();
         virtual void reset_eh();
+        virtual bool include_func_interp(func_decl* f);
         svector<theory_var>   m_merge_aux[2]; //!< auxiliary vector used in merge_zero_one_bits
         bool merge_zero_one_bits(theory_var r1, theory_var r2);
 
@@ -278,5 +279,5 @@ namespace smt {
     };
 };
 
-#endif /* _THEORY_BV_H_ */
+#endif /* THEORY_BV_H_ */
 

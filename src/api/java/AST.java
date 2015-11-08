@@ -22,10 +22,8 @@ import com.microsoft.z3.enumerations.Z3_ast_kind;
 /**
  * The abstract syntax tree (AST) class.
  **/
-public class AST extends Z3Object
+public class AST extends Z3Object implements Comparable
 {
-    /* Overloaded operators are not translated. */
-
     /**
      * Object comparison.
      * 
@@ -43,7 +41,11 @@ public class AST extends Z3Object
             return false;
         }
 
-        return this.getNativeObject() == casted.getNativeObject();
+        return  (this == casted) ||
+                (this != null) &&
+                (casted != null) &&
+                (getContext().nCtx() == casted.getContext().nCtx()) &&
+                (Native.isEqAst(getContext().nCtx(), getNativeObject(), casted.getNativeObject()));
     }
 
     /**

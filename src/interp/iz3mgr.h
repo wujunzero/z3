@@ -26,6 +26,7 @@
 #include <functional>
 
 #include "iz3hash.h"
+#include "iz3exception.h"
 
 #include"well_sorted.h"
 #include"arith_decl_plugin.h"
@@ -279,6 +280,12 @@ class iz3mgr  {
             res[i] = arg(t,i);
     }
 
+    std::vector<ast> args(const ast &t){
+        std::vector<ast> res;
+        get_args(t,res);
+        return res;
+    }
+
     symb sym(ast t){
         raw_ast *_ast = t.raw();
         return is_app(_ast) ? to_app(_ast)->get_decl() : 0;
@@ -390,7 +397,7 @@ class iz3mgr  {
         return UnknownTheory;
     }
 
-    enum lemma_kind {FarkasKind,Leq2EqKind,Eq2LeqKind,GCDTestKind,AssignBoundsKind,EqPropagateKind,ArithMysteryKind,UnknownKind};
+    enum lemma_kind {FarkasKind,Leq2EqKind,Eq2LeqKind,GCDTestKind,AssignBoundsKind,EqPropagateKind,GomoryCutKind,ArithMysteryKind,UnknownKind};
 
     lemma_kind get_theory_lemma_kind(const ast &proof){
         symb s = sym(proof);
@@ -411,12 +418,16 @@ class iz3mgr  {
             return AssignBoundsKind;
         if(foo == "eq-propagate")
             return EqPropagateKind;
+        if(foo == "gomory-cut")
+            return GomoryCutKind;
         return UnknownKind;
     }
 
     void get_farkas_coeffs(const ast &proof, std::vector<ast>& coeffs);
 
     void get_farkas_coeffs(const ast &proof, std::vector<rational>& rats);
+
+    void get_broken_gcd_test_coeffs(const ast &proof, std::vector<rational>& rats);
 
     void get_assign_bounds_coeffs(const ast &proof, std::vector<rational>& rats);
 
@@ -425,6 +436,10 @@ class iz3mgr  {
     void get_assign_bounds_rule_coeffs(const ast &proof, std::vector<rational>& rats);
   
     void get_assign_bounds_rule_coeffs(const ast &proof, std::vector<ast>& rats);
+
+    void get_gomory_cut_coeffs(const ast &proof, std::vector<rational>& rats);
+
+    void get_gomory_cut_coeffs(const ast &proof, std::vector<ast>& rats);
 
     bool is_farkas_coefficient_negative(const ast &proof, int n);
 

@@ -293,7 +293,7 @@ public:
                         ast neglit = mk_not(arg(con,i));
                         res.erase(neglit);
                     }
-                }	    
+                }        
             }
         }
 #if 0
@@ -589,13 +589,15 @@ public:
             rng = range_glb(rng,ast_scope(lit));
         }
         if(range_is_empty(rng)) return -1;
-	int hi = range_max(rng);
+    int hi = range_max(rng);
         if(hi >= frames) return frames - 1;
         return hi;
     }
 
 
-    struct invalid_lemma {};
+    struct invalid_lemma: public iz3_exception {
+        invalid_lemma(): iz3_exception("invalid_lemma") {}
+    };
 
 
 
@@ -846,7 +848,9 @@ public:
             return 1;
     }
 
-    struct non_lit_local_ante {};
+    struct non_lit_local_ante: public iz3_exception {
+        non_lit_local_ante(): iz3_exception("non_lit_local_ante") {}
+    };
 
     bool local_antes_simple;
 
@@ -881,7 +885,7 @@ public:
            || dk == PR_QUANT_INST
            //|| dk == PR_UNIT_RESOLUTION
            //|| dk == PR_LEMMA
-	   )
+       )
             return false;
         if(dk == PR_HYPOTHESIS && hyps.find(con) != hyps.end())
             ; //std::cout << "blif!\n";
@@ -1481,7 +1485,7 @@ public:
                 AstSet dummy;
                 collect_resolvent_lits(nll->proofs[i],dummy,reslits);
                 litset.insert(reslits.begin(),reslits.end());
-            }	
+            }    
         }
         if(to_keep.size() == nll->proofs.size()) return nll;
         ResolventAppSet new_proofs;

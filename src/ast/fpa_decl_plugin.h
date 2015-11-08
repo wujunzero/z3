@@ -16,8 +16,8 @@ Author:
 Revision History:
 
 --*/
-#ifndef _fpa_decl_plugin_H_
-#define _fpa_decl_plugin_H_
+#ifndef fpa_decl_plugin_H_
+#define fpa_decl_plugin_H_
 
 #include"ast.h"
 #include"id_gen.h"
@@ -33,6 +33,8 @@ enum fpa_sort_kind {
     FLOAT64_SORT,
     FLOAT128_SORT
 };
+
+typedef enum { BV_RM_TIES_TO_EVEN, BV_RM_TIES_TO_AWAY, BV_RM_TO_POSITIVE, BV_RM_TO_NEGATIVE, BV_RM_TO_ZERO = 4 } BV_RM_VAL;
 
 enum fpa_op_kind {
     OP_FPA_RM_NEAREST_TIES_TO_EVEN,
@@ -85,10 +87,17 @@ enum fpa_op_kind {
     OP_FPA_TO_IEEE_BV,
 
     /* Internal use only */
+    OP_FPA_INTERNAL_RM, // Internal conversion from (_ BitVec 3) to RoundingMode
     OP_FPA_INTERNAL_BVWRAP,
-    OP_FPA_INTERNAL_BVUNWRAP,
+    OP_FPA_INTERNAL_BVUNWRAP,    
+    
+    OP_FPA_INTERNAL_MIN_I,
+    OP_FPA_INTERNAL_MAX_I,
+    OP_FPA_INTERNAL_MIN_UNSPECIFIED,
+    OP_FPA_INTERNAL_MAX_UNSPECIFIED,
     OP_FPA_INTERNAL_TO_UBV_UNSPECIFIED,
     OP_FPA_INTERNAL_TO_SBV_UNSPECIFIED,    
+    OP_FPA_INTERNAL_TO_IEEE_BV_UNSPECIFIED,
     OP_FPA_INTERNAL_TO_REAL_UNSPECIFIED,    
 
     LAST_FLOAT_OP
@@ -122,6 +131,7 @@ class fpa_decl_plugin : public decl_plugin {
 
     sort * mk_float_sort(unsigned ebits, unsigned sbits);
     sort * mk_rm_sort();
+
     func_decl * mk_rm_const_decl(decl_kind k, unsigned num_parameters, parameter const * parameters,
                                  unsigned arity, sort * const * domain, sort * range);
     func_decl * mk_float_const_decl(decl_kind k, unsigned num_parameters, parameter const * parameters,
@@ -152,9 +162,11 @@ class fpa_decl_plugin : public decl_plugin {
                           unsigned arity, sort * const * domain, sort * range);
     func_decl * mk_to_real(decl_kind k, unsigned num_parameters, parameter const * parameters,
                            unsigned arity, sort * const * domain, sort * range);
-    func_decl * mk_float_to_ieee_bv(decl_kind k, unsigned num_parameters, parameter const * parameters,
-                                    unsigned arity, sort * const * domain, sort * range);
+    func_decl * mk_to_ieee_bv(decl_kind k, unsigned num_parameters, parameter const * parameters,
+                              unsigned arity, sort * const * domain, sort * range);
 
+    func_decl * mk_internal_rm(decl_kind k, unsigned num_parameters, parameter const * parameters,
+                               unsigned arity, sort * const * domain, sort * range);
     func_decl * mk_internal_bv_wrap(decl_kind k, unsigned num_parameters, parameter const * parameters,
                                     unsigned arity, sort * const * domain, sort * range);
     func_decl * mk_internal_bv_unwrap(decl_kind k, unsigned num_parameters, parameter const * parameters,
@@ -169,6 +181,7 @@ class fpa_decl_plugin : public decl_plugin {
     virtual void set_manager(ast_manager * m, family_id id);
     unsigned mk_id(mpf const & v);
     void recycled_id(unsigned id);
+
 public:
     fpa_decl_plugin();
     
@@ -329,10 +342,11 @@ public:
 
     bool is_neg(expr * a) { return is_app_of(a, m_fid, OP_FPA_NEG); }
 
-    app * mk_float_to_ieee_bv(expr * arg1) { return m().mk_app(m_fid, OP_FPA_TO_IEEE_BV, arg1); }
+    app * mk_to_ieee_bv(expr * arg1) { return m().mk_app(m_fid, OP_FPA_TO_IEEE_BV, arg1); }
 
     app * mk_internal_to_ubv_unspecified(unsigned width);
     app * mk_internal_to_sbv_unspecified(unsigned width);
+    app * mk_internal_to_ieee_bv_unspecified(unsigned width);
     app * mk_internal_to_real_unspecified();
 
     bool is_wrap(expr * e) const { return is_app_of(e, get_family_id(), OP_FPA_INTERNAL_BVWRAP); }

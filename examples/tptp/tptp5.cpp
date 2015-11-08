@@ -1,3 +1,9 @@
+
+/*++
+Copyright (c) 2015 Microsoft Corporation
+
+--*/
+
 #include <string>
 #include <cstring>
 #include <list>
@@ -255,7 +261,7 @@ class env {
         parse(inc_name.c_str(), fmls);
         while (name_list) {
             return mk_error(name_list, "name list (not handled)");
-            char const* name = name_list->child(0)->symbol();
+            //char const* name = name_list->child(0)->symbol();
             name_list = name_list->child(2);            
         }
     }
@@ -608,7 +614,7 @@ class env {
 
     void mk_mapping_sort(TreeNode* t, z3::sort_vector& domain, z3::sort& s) {
         char const* name = t->symbol();
-        char const* id = 0;
+        //char const* id = 0;
         if (!strcmp(name,"tff_top_level_type")) {
             mk_mapping_sort(t->child(0), domain, s);
         }
@@ -809,8 +815,12 @@ class env {
                 r = terms[0] / terms[1];
             }
             else if (!strcmp(ch,"$distinct")) {
-                check_arity(terms.size(), 2);
-                r = terms[0] != terms[1];
+                if (terms.size() == 2) {
+                    r = terms[0] != terms[1];
+                }
+                else {
+                    r = distinct(terms);
+                }
             }
             else if (!strcmp(ch,"$floor") || !strcmp(ch,"$to_int")) {
                 check_arity(terms.size(), 1);
@@ -1089,12 +1099,11 @@ class env {
     }
 
     z3::sort mk_sort(char const* s) {
-        z3::symbol sym = symbol(s);
-        return mk_sort(sym);
+        return m_context.uninterpreted_sort(s);
     }
 
     z3::sort mk_sort(z3::symbol& s) {
-        return z3::sort(m_context, Z3_mk_uninterpreted_sort(m_context, s));
+        return m_context.uninterpreted_sort(s);
     }
     
 public:
@@ -1823,7 +1832,7 @@ public:
     }
 
     z3::expr get_proof_formula(z3::expr proof) {
-        unsigned na = proof.num_args();
+        // unsigned na = proof.num_args();
         z3::expr result = proof.arg(proof.num_args()-1);
         std::vector<z3::sort> vars;
         get_free_vars(result, vars);
@@ -2083,7 +2092,7 @@ bool parse_is_sat_line(char const* line, bool& is_sat) {
         return true;
     }
     return false;
-}
+}    
 
 bool parse_is_sat(char const* filename, bool& is_sat) {
     std::ifstream is(filename);
@@ -2110,7 +2119,7 @@ void parse_cmd_line_args(int argc, char ** argv) {
     int i = 1;
     while (i < argc) {
         char* arg = argv[i];
-        char * eq = 0;
+        //char * eq = 0;
         char * opt_arg = 0;
         if (arg[0] == '-' || arg[0] == '/') {
             ++arg;
@@ -2458,7 +2467,7 @@ static void prove_tptp() {
 
 int main(int argc, char** argv) {
 
-    std::ostream* out = &std::cout;
+    //std::ostream* out = &std::cout;
     g_start_time = static_cast<double>(clock());
     signal(SIGINT, on_ctrl_c);
 

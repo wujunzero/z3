@@ -21,14 +21,12 @@ Notes:
 #include"ast_smt2_pp.h"
 #include"ast_pp.h"
 #include"model_smt2_pp.h"
-#include"model_v2_pp.h"
 #include"array_decl_plugin.h"
 #include"pp.h"
 #include"cmd_util.h"
 #include"simplify_cmd.h"
 #include"eval_cmd.h"
 #include"gparams.h"
-#include"model_params.hpp"
 #include"env_params.h"
 
 class help_cmd : public cmd {
@@ -105,17 +103,7 @@ ATOMIC_CMD(get_model_cmd, "get-model", "retrieve model for the last check-sat co
         throw cmd_exception("model is not available");
     model_ref m;
     ctx.get_check_sat_result()->get_model(m);
-    model_params p;
-    if (p.v1() || p.v2()) {
-        std::ostringstream buffer;
-        model_v2_pp(buffer, *m, p.partial());
-        ctx.regular_stream() << "\"" << escaped(buffer.str().c_str(), true) << "\"" << std::endl;
-    } else {
-        ctx.regular_stream() << "(model " << std::endl;
-        model_smt2_pp(ctx.regular_stream(), ctx, *(m.get()), 2);
-        // m->display(ctx.regular_stream());
-        ctx.regular_stream() << ")" << std::endl;
-    }
+    ctx.display_model(m);
 });
 
 ATOMIC_CMD(get_assignment_cmd, "get-assignment", "retrieve assignment", {
@@ -217,7 +205,7 @@ UNARY_CMD(set_logic_cmd, "set-logic", "<symbol>", "set the background logic.", C
           if (ctx.set_logic(arg))
               ctx.print_success();
           else
-              ctx.print_unsupported(symbol::null);
+              ctx.print_unsupported(symbol::null, m_line, m_pos);
           );
 
 UNARY_CMD(pp_cmd, "display", "<term>", "display the given term.", CPK_EXPR, expr *, { 
@@ -448,7 +436,7 @@ public:
 
     virtual void execute(cmd_context & ctx) {
         if (m_unsupported)
-            ctx.print_unsupported(m_option);
+            ctx.print_unsupported(m_option, m_line, m_pos);
         else
             ctx.print_success();
     }
@@ -484,7 +472,7 @@ public:
         // print_bool(ctx, );
         // }
         else if (opt == m_expand_definitions) {
-            ctx.print_unsupported(m_expand_definitions);
+            ctx.print_unsupported(m_expand_definitions, m_line, m_pos);
         }
         else if (opt == m_interactive_mode) {
             print_bool(ctx, ctx.interactive_mode());
@@ -535,7 +523,7 @@ public:
                 ctx.regular_stream() << gparams::get_value(opt) << std::endl;
             }
             catch (gparams::exception ex) {
-                ctx.print_unsupported(opt);
+                ctx.print_unsupported(opt, m_line, m_pos);
             }
         }
     }
@@ -597,7 +585,7 @@ public:
             ctx.display_statistics();
         }
         else {
-            ctx.print_unsupported(opt);
+            ctx.print_unsupported(opt, m_line, m_pos);
         }
     }
 };

@@ -16,8 +16,8 @@ Author:
 Revision History:
 
 --*/
-#ifndef _SMT_THEORY_H_
-#define _SMT_THEORY_H_
+#ifndef SMT_THEORY_H_
+#define SMT_THEORY_H_
 
 #include"smt_enode.h"
 #include"obj_hashtable.h"
@@ -412,6 +412,10 @@ namespace smt {
             return 0;
         }
 
+        virtual bool include_func_interp(func_decl* f) {
+            return false;
+        }
+
         // -----------------------------------
         //
         // Model checker
@@ -450,5 +454,5 @@ namespace smt {
     
 };
 
-#endif /* _SMT_THEORY_H_ */
+#endif /* SMT_THEORY_H_ */
 

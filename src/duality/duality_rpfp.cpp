@@ -1171,7 +1171,7 @@ namespace Duality {
                 new_alits.push_back(conj);
 #endif
                 slvr().add(ctx.make(Implies, res, conj));
-                //	std::cout << res << ": " << conj << "\n";
+                // std::cout << res << ": " << conj << "\n";
             }
             if (opt_map)
                 (*opt_map)[res] = conj;
@@ -2734,7 +2734,7 @@ namespace Duality {
         if(res != unsat)
             throw "should be unsat";
         s.pop(1);
-	
+
         for(unsigned i = 0; i < conjuncts.size(); ){
             std::swap(conjuncts[i],conjuncts.back());
             expr save = conjuncts.back();
@@ -2870,10 +2870,10 @@ namespace Duality {
             lits = assumps; 
             std::copy(core.begin(),core.end(),std::inserter(lits,lits.end()));
       
-            for(int k = 0; k < 100; k++) // keep trying, maybe MBQI will do something!
+            for(int k = 0; k < 4; k++) // keep trying, maybe MBQI will do something!
                 if((res = CheckCore(lits,full_core)) == unsat)
                     goto is_unsat;
-            throw "should be unsat";
+            throw greedy_reduce_failed();
         }
     is_unsat:
         FilterCore(core,full_core);
@@ -3056,7 +3056,7 @@ namespace Duality {
             Push();
             expr the_impl = is.get_implicant();
             if(eq(the_impl,prev_impl)){
-                //	std::cout << "got old implicant\n";
+                // std::cout << "got old implicant\n";
                 repeated_case_count++;
             }
             prev_impl = the_impl;
@@ -3084,8 +3084,18 @@ namespace Duality {
                     }
                 }
                 // AddToProofCore(*core);
-                SolveSingleNode(root,node);
-
+                
+                try {
+                    SolveSingleNode(root,node);
+                }
+                catch (char const *msg){
+                    // This happens if interpolation fails
+                    Pop(1);
+                    is.pop(1);
+                    delete core;
+                    timer_stop("InterpolateByCases");
+                    throw msg;
+                }
                 {
                     expr itp = GetAnnotation(node);
                     dualModel = is.get_model(); // TODO: what does this mean?
@@ -3126,8 +3136,8 @@ namespace Duality {
                     axioms_added = true;
                 }
                 else {
-                    //#define KILL_ON_BAD_INTERPOLANT	  
-#ifdef KILL_ON_BAD_INTERPOLANT	  
+                    //#define KILL_ON_BAD_INTERPOLANT   
+#ifdef KILL_ON_BAD_INTERPOLANT 
                     std::cout << "bad in InterpolateByCase -- core:\n";
 #if 0
                     std::vector<expr> assumps;
@@ -3137,7 +3147,7 @@ namespace Duality {
 #endif
                     std::cout << "checking for inconsistency\n";
                     std::cout << "model:\n";
-                    is.get_model().show();	  
+                    is.get_model().show(); 
                     expr impl = is.get_implicant();
                     std::vector<expr> conjuncts;
                     CollectConjuncts(impl,conjuncts,true);
@@ -3379,7 +3389,7 @@ namespace Duality {
         int arity = f.arity();
         std::vector<sort> domain;
         for(int i = 0; i < arity; i++)
-	    domain.push_back(f.domain(i));
+        domain.push_back(f.domain(i));
         return ctx.function(name.c_str(), arity, &domain[0], f.range());
     }
 
@@ -3390,7 +3400,7 @@ namespace Duality {
         int arity = f.arity();
         std::vector<sort> domain;
         for(int i = 0; i < arity; i++)
-	    domain.push_back(f.domain(i));
+        domain.push_back(f.domain(i));
         return ctx.function(name.c_str(), arity, &domain[0], f.range());
     }
 

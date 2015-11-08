@@ -59,13 +59,17 @@ void grobner::del_equation(equation * eq) {
     m_to_process.erase(eq);
     SASSERT(m_equations_to_delete[eq->m_bidx] == eq);
     m_equations_to_delete[eq->m_bidx] = 0;
-    ptr_vector<monomial>::iterator it1  = eq->m_monomials.begin();
-    ptr_vector<monomial>::iterator end1 = eq->m_monomials.end();
-    for (; it1 != end1; ++it1) {
-        monomial * m = *it1;
-        del_monomial(m);
-    }
+    del_monomials(eq->m_monomials);
     dealloc(eq);
+}
+
+void grobner::del_monomials(ptr_vector<monomial>& ms) {
+    ptr_vector<monomial>::iterator it  = ms.begin();
+    ptr_vector<monomial>::iterator end = ms.end();
+    for (; it != end; ++it) {
+        del_monomial(*it);
+    }
+    ms.reset();
 }
 
 void grobner::del_monomial(monomial * m) {
@@ -436,16 +440,19 @@ void grobner::merge_monomials(ptr_vector<monomial> & monomials) {
     unsigned sz = monomials.size();
     if (sz == 0)
         return;
+    SASSERT(&m_del_monomials != &monomials);
+    ptr_vector<monomial>& to_delete = m_del_monomials;
+    to_delete.reset();
     for (unsigned i = 1; i < sz; ++i) {
         monomial * m1 = monomials[j];
         monomial * m2 = monomials[i];
         if (is_eq_monomial_body(m1, m2)) {
             m1->m_coeff += m2->m_coeff;
-            del_monomial(m2);
+            to_delete.push_back(m2);
         } 
         else {
             if (m1->m_coeff.is_zero())
-                del_monomial(m1); // cancelled
+                to_delete.push_back(m1);
             else
                 j++;
             monomials[j] = m2;
@@ -454,10 +461,11 @@ void grobner::merge_monomials(ptr_vector<monomial> & monomials) {
     SASSERT(j < sz);
     monomial * m1 = monomials[j];
     if (m1->m_coeff.is_zero())
-        del_monomial(m1); // cancelled
+        to_delete.push_back(m1);
     else
         j++;
     monomials.shrink(j);
+    del_monomials(to_delete);    
     TRACE("grobner", tout << "after merging monomials:\n"; display_monomials(tout, monomials.size(), monomials.c_ptr()); tout << "\n";);
 }
 
@@ -649,6 +657,7 @@ grobner::equation * grobner::simplify(equation const * source, equation * target
                     target->m_lc = false;
                 mul_append(1, source, coeff, rest, new_monomials);
                 del_monomial(curr);
+                target->m_monomials[i] = 0;
             }
             else {
                 target->m_monomials[j] = curr;
@@ -914,30 +923,39 @@ void grobner::superpose(equation * eq) {
     }
 }
 
-bool grobner::compute_basis(unsigned threshold) {
+void grobner::compute_basis_init() {
     m_stats.m_compute_basis++;
     m_num_new_equations = 0;
-    while (m_num_new_equations < threshold) {
-        equation * eq = pick_next();
-        if (!eq)
-            return true;
-        m_stats.m_num_processed++;
+}
+
+bool grobner::compute_basis_step() {
+    equation * eq = pick_next();
+    if (!eq)
+        return true;
+    m_stats.m_num_processed++;
 #ifdef PROFILE_GB
-        if (m_stats.m_num_processed % 100 == 0) {
-            verbose_stream() << "[grobner] " << m_processed.size() << " " << m_to_process.size() << "\n";
-        }
+    if (m_stats.m_num_processed % 100 == 0) {
+        verbose_stream() << "[grobner] " << m_processed.size() << " " << m_to_process.size() << "\n";
+    }
 #endif
-        equation * new_eq = simplify_using_processed(eq);
-        if (new_eq != 0 && eq != new_eq) {
-            // equation was updated using non destructive updates
-            m_equations_to_unfreeze.push_back(eq);
-            eq = new_eq;
-        }
-        simplify_processed(eq);
-        superpose(eq);
-        m_processed.insert(eq);
-        simplify_to_process(eq);
-        TRACE("grobner", tout << "end of iteration:\n"; display(tout););
+    equation * new_eq = simplify_using_processed(eq);
+    if (new_eq != 0 && eq != new_eq) {
+        // equation was updated using non destructive updates
+        m_equations_to_unfreeze.push_back(eq);
+        eq = new_eq;
+    }
+    simplify_processed(eq);
+    superpose(eq);
+    m_processed.insert(eq);
+    simplify_to_process(eq);
+    TRACE("grobner", tout << "end of iteration:\n"; display(tout););
+    return false;
+}
+
+bool grobner::compute_basis(unsigned threshold) {
+    compute_basis_init();
+    while (m_num_new_equations < threshold) {
+        if (compute_basis_step()) return true;
     }
     return false;
 }
