@@ -90,7 +90,13 @@ FPMATH="Default"
 FPMATH_FLAGS="-mfpmath=sse -msse -msse2"
 
 def check_output(cmd):
-    return (subprocess.Popen(cmd, stdout=subprocess.PIPE).communicate()[0]).decode("utf-8").rstrip('\r\n')
+    out = subprocess.Popen(cmd, stdout=subprocess.PIPE).communicate()[0]
+    if out != None:
+        enc = sys.stdout.encoding
+        if enc != None: return out.decode(enc).rstrip('\r\n')
+        else: return out.rstrip('\r\n')
+    else:
+        return ""
 
 def git_hash():
     try:

@@ -770,7 +770,7 @@ namespace opt {
                   tout << "offset: " << offset << "\n";
                   );
             std::ostringstream out;
-            out << mk_pp(orig_term, m);
+            out << mk_pp(orig_term, m) << ":" << index;
             id = symbol(out.str().c_str());
             return true;
         }
@@ -793,7 +793,7 @@ namespace opt {
             }
             neg = true;
             std::ostringstream out;
-            out << mk_pp(orig_term, m);
+            out << mk_pp(orig_term, m) << ":" << index;
             id = symbol(out.str().c_str());
             return true;
         }
@@ -812,7 +812,7 @@ namespace opt {
             }
             neg = is_max;
             std::ostringstream out;
-            out << mk_pp(orig_term, m);
+            out << mk_pp(orig_term, m) << ":" << index;
             id = symbol(out.str().c_str());
             return true;            
         }
@@ -900,6 +900,21 @@ namespace opt {
             }
             else {
                 m_hard_constraints.push_back(fml);
+            }
+        }
+        // fix types of objectives:
+        for (unsigned i = 0; i < m_objectives.size(); ++i) {
+            objective & obj = m_objectives[i];
+            expr* t = obj.m_term;
+            switch(obj.m_type) {
+            case O_MINIMIZE:
+            case O_MAXIMIZE:
+                if (!m_arith.is_int(t) && !m_arith.is_real(t)) {
+                    obj.m_term = m_arith.mk_numeral(rational(0), true);
+                }
+                break;
+            default:
+                break;
             }
         }
     }
@@ -1000,7 +1015,10 @@ namespace opt {
             switch(obj.m_type) {
             case O_MINIMIZE: {
                 app_ref tmp(m);
-                tmp = m_arith.mk_uminus(obj.m_term);
+                tmp = obj.m_term;
+                if (m_arith.is_int(tmp) || m_arith.is_real(tmp)) {
+                    tmp = m_arith.mk_uminus(obj.m_term);
+                }
                 obj.m_index = m_optsmt.add(tmp);
                 break;
             }
