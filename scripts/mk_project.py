@@ -76,21 +76,22 @@ def init_project_def():
     add_lib('portfolio', ['smtlogic_tactics', 'sat_solver', 'ufbv_tactic', 'fpa_tactics', 'aig_tactic', 'fp',  'qe','sls_tactic', 'subpaving_tactic'], 'tactic/portfolio')
     add_lib('smtparser', ['portfolio'], 'parsers/smt')
     add_lib('opt', ['smt', 'smtlogic_tactics', 'sls_tactic', 'sat_solver'], 'opt')
-    API_files = ['z3_api.h', 'z3_algebraic.h', 'z3_polynomial.h', 'z3_rcf.h', 'z3_interp.h', 'z3_fpa.h']
+    API_files = ['z3_api.h', 'z3_ast_containers.h', 'z3_algebraic.h', 'z3_polynomial.h', 'z3_rcf.h', 'z3_fixedpoint.h', 'z3_optimization.h', 'z3_interp.h', 'z3_fpa.h']
     add_lib('api', ['portfolio', 'smtparser', 'realclosure', 'interp', 'opt'],
             includes2install=['z3.h', 'z3_v1.h', 'z3_macros.h'] + API_files)
     add_exe('shell', ['api', 'sat', 'extra_cmds','opt'], exe_name='z3')
     add_exe('test', ['api', 'fuzzing', 'simplex'], exe_name='test-z3', install=False)
-    add_dll('api_dll', ['api', 'sat', 'extra_cmds'], 'api/dll', 
-            reexports=['api'], 
-            dll_name='libz3', 
-            static=build_static_lib(),
-            export_files=API_files)
+    _libz3Component = add_dll('api_dll', ['api', 'sat', 'extra_cmds'], 'api/dll',
+                              reexports=['api'],
+                              dll_name='libz3',
+                              static=build_static_lib(),
+                              export_files=API_files)
     add_dot_net_dll('dotnet', ['api_dll'], 'api/dotnet', dll_name='Microsoft.Z3', assembly_info_dir='Properties')
     add_java_dll('java', ['api_dll'], 'api/java', dll_name='libz3java', package_name="com.microsoft.z3", manifest_file='manifest')
     add_ml_lib('ml', ['api_dll'], 'api/ml', lib_name='libz3ml')
     add_hlib('cpp', 'api/c++', includes2install=['z3++.h'])
     set_z3py_dir('api/python')
+    add_python_install(_libz3Component)
     # Examples
     add_cpp_example('cpp_example', 'c++') 
     add_cpp_example('z3_tptp', 'tptp') 

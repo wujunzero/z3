@@ -912,6 +912,11 @@ def _to_expr_ref(a, ctx):
             return FPNumRef(a, ctx)
         else:
             return FPRef(a, ctx)
+    if sk == Z3_FINITE_DOMAIN_SORT:
+        if k == Z3_NUMERAL_AST:
+            return FiniteDomainNumRef(a, ctx)
+        else:
+            return FiniteDomainRef(a, ctx)
     if sk == Z3_ROUNDING_MODE_SORT:
         return FPRMRef(a, ctx)
     return ExprRef(a, ctx)
@@ -6395,7 +6400,7 @@ class Fixedpoint(Z3PPObject):
 
 #########################################
 #
-# Finite domain sorts
+# Finite domains
 #
 #########################################
 
@@ -6412,8 +6417,101 @@ class FiniteDomainSortRef(SortRef):
 
 def FiniteDomainSort(name, sz, ctx=None):
     """Create a named finite domain sort of a given size sz"""
+    if not isinstance(name, Symbol):
+        name = to_symbol(name)
     ctx = _get_ctx(ctx)
     return FiniteDomainSortRef(Z3_mk_finite_domain_sort(ctx.ref(), name, sz), ctx)
+
+def is_finite_domain_sort(s):
+    """Return True if `s` is a Z3 finite-domain sort.
+
+    >>> is_finite_domain_sort(FiniteDomainSort('S', 100))
+    True
+    >>> is_finite_domain_sort(IntSort())
+    False
+    """
+    return isinstance(s, FiniteDomainSortRef)
+
+
+class FiniteDomainRef(ExprRef):
+    """Finite-domain expressions."""
+        
+    def sort(self):
+        """Return the sort of the finite-domain expression `self`."""
+        return FiniteDomainSortRef(Z3_get_sort(self.ctx_ref(), self.as_ast()), self.ctx)
+
+    def as_string(self):
+        """Return a Z3 floating point expression as a Python string."""
+        return Z3_ast_to_string(self.ctx_ref(), self.as_ast())    
+
+def is_finite_domain(a):
+    """Return `True` if `a` is a Z3 finite-domain expression.
+    
+    >>> s = FiniteDomainSort('S', 100)
+    >>> b = Const('b', s)
+    >>> is_finite_domain(b)
+    True
+    >>> is_finite_domain(Int('x'))
+    False
+    """
+    return isinstance(a, FiniteDomainRef)
+
+    
+class FiniteDomainNumRef(FiniteDomainRef):
+    """Integer values."""
+
+    def as_long(self):
+        """Return a Z3 finite-domain numeral as a Python long (bignum) numeral. 
+        
+        >>> s = FiniteDomainSort('S', 100)
+        >>> v = FiniteDomainVal(3, s)
+        >>> v
+        3
+        >>> v.as_long() + 1
+        4
+        """
+        return int(self.as_string())
+
+    def as_string(self):
+        """Return a Z3 finite-domain numeral as a Python string.
+
+        >>> s = FiniteDomainSort('S', 100)
+        >>> v = FiniteDomainVal(42, s)
+        >>> v.as_string()
+        '42'
+        """
+        return Z3_get_numeral_string(self.ctx_ref(), self.as_ast())
+
+    
+def FiniteDomainVal(val, sort, ctx=None):
+    """Return a Z3 finite-domain value. If `ctx=None`, then the global context is used.
+    
+    >>> s = FiniteDomainSort('S', 256)
+    >>> FiniteDomainVal(255, s)
+    255
+    >>> FiniteDomainVal('100', s)
+    100
+    """
+    if __debug__:
+        _z3_assert(is_finite_domain_sort(sort), "Expected finite-domain sort" )
+    ctx = sort.ctx
+    return FiniteDomainNumRef(Z3_mk_numeral(ctx.ref(), _to_int_str(val), sort.ast), ctx)
+    
+def is_finite_domain_value(a):
+    """Return `True` if `a` is a Z3 finite-domain value.
+
+    >>> s = FiniteDomainSort('S', 100)
+    >>> b = Const('b', s)
+    >>> is_finite_domain_value(b)
+    False
+    >>> b = FiniteDomainVal(10, s)
+    >>> b
+    10
+    >>> is_finite_domain_value(b)
+    True
+    """
+    return is_finite_domain(a) and _is_numeral(a.ctx, a.as_ast())
+
 
 #########################################
 #
@@ -8091,7 +8189,7 @@ def is_fprm_value(a):
 class FPNumRef(FPRef):
     def isNaN(self):
         return self.decl().kind() == Z3_OP_FPA_NAN
-    
+
     def isInf(self):
         return self.decl().kind() == Z3_OP_FPA_PLUS_INF or self.decl().kind() == Z3_OP_FPA_MINUS_INF
 
@@ -8103,7 +8201,7 @@ class FPNumRef(FPRef):
         return (self.num_args() == 0 and (k == Z3_OP_FPA_MINUS_INF or k == Z3_OP_FPA_MINUS_ZERO)) or (self.sign() == True)
 
     """
-    The sign of the numeral
+    The sign of the numeral.
 
     >>> x = FPNumRef(+1.0, FPSort(8, 24))
     >>> x.sign()
@@ -8117,30 +8215,32 @@ class FPNumRef(FPRef):
         if Z3_fpa_get_numeral_sign(self.ctx.ref(), self.as_ast(), byref(l)) == False:
             raise Z3Exception("error retrieving the sign of a numeral.")
         return l.value != 0
-    
+
     """
-    The significand of the numeral
+    The significand of the numeral.
 
     >>> x = FPNumRef(2.5, FPSort(8, 24))
+    >>> x.significand()
     1.25
     """
     def significand(self):
         return Z3_fpa_get_numeral_significand_string(self.ctx.ref(), self.as_ast())
 
     """
-    The exponent of the numeral
+    The exponent of the numeral.
 
     >>> x = FPNumRef(2.5, FPSort(8, 24))
-    >>> 
+    >>> x.exponent()
     1
     """
     def exponent(self):
         return Z3_fpa_get_numeral_exponent_string(self.ctx.ref(), self.as_ast())
 
     """
-    The exponent of the numeral as a long
+    The exponent of the numeral as a long.
 
     >>> x = FPNumRef(2.5, FPSort(8, 24))
+    >>> x.exponent_as_long()
     1
     """
     def exponent_as_long(self):
@@ -8148,11 +8248,12 @@ class FPNumRef(FPRef):
         if not Z3_fpa_get_numeral_exponent_int64(self.ctx.ref(), self.as_ast(), ptr):
             raise Z3Exception("error retrieving the exponent of a numeral.") 
         return ptr[0]
-    
+
     """
-    The string representation of the numeral
+    The string representation of the numeral.
 
     >>> x = FPNumRef(20, FPSort(8, 24))
+    >>> x.as_string()
     1.25*(2**4)
     """
     def as_string(self):
@@ -8280,7 +8381,7 @@ def FPVal(sig, exp=None, fps=None, ctx=None):
     val = val + 'p'
     val = val + _to_int_str(exp)
     return FPNumRef(Z3_mk_numeral(ctx.ref(), val, fps.ast), ctx)
-        
+
 def FP(name, fpsort, ctx=None):
     """Return a floating-point constant named `name`. 
     `fpsort` is the floating-point sort.
@@ -8542,47 +8643,47 @@ def fpIsNaN(a):
     return FPRef(Z3_mk_fpa_is_nan(a.ctx_ref(), a.as_ast()), a.ctx) 
 
 def fpIsInfinite(a):
-    """Create a Z3 floating-point isNaN expression.
+    """Create a Z3 floating-point isInfinite expression.
     """
     if __debug__:        
         _z3_assert(is_fp(a), "Argument must be Z3 floating-point expressions")
     return FPRef(Z3_mk_fpa_is_infinite(a.ctx_ref(), a.as_ast()), a.ctx) 
 
 def fpIsZero(a):
-    """Create a Z3 floating-point isNaN expression.
+    """Create a Z3 floating-point isZero expression.
     """
     if __debug__:        
         _z3_assert(is_fp(a), "Argument must be Z3 floating-point expressions")
     return FPRef(Z3_mk_fpa_is_zero(a.ctx_ref(), a.as_ast()), a.ctx) 
 
 def fpIsNormal(a):
-    """Create a Z3 floating-point isNaN expression.
+    """Create a Z3 floating-point isNormal expression.
     """
     if __debug__:        
         _z3_assert(is_fp(a), "Argument must be Z3 floating-point expressions")
     return FPRef(Z3_mk_fpa_is_normal(a.ctx_ref(), a.as_ast()), a.ctx) 
 
 def fpIsSubnormal(a):
-    """Create a Z3 floating-point isNaN expression.
+    """Create a Z3 floating-point isSubnormal expression.
     """
     if __debug__:        
         _z3_assert(is_fp(a), "Argument must be Z3 floating-point expressions")
     return FPRef(Z3_mk_fpa_is_subnormal(a.ctx_ref(), a.as_ast()), a.ctx) 
 
 def fpIsNegative(a):
-    """Create a Z3 floating-point isNaN expression.
+    """Create a Z3 floating-point isNegative expression.
     """
     if __debug__:        
         _z3_assert(is_fp(a), "Argument must be Z3 floating-point expressions")
     return FPRef(Z3_mk_fpa_is_negative(a.ctx_ref(), a.as_ast()), a.ctx) 
 
 def fpIsPositive(a):
-    """Create a Z3 floating-point isNaN expression.
+    """Create a Z3 floating-point isPositive expression.
     """
     if __debug__:        
         _z3_assert(is_fp(a), "Argument must be Z3 floating-point expressions")
     return FPRef(Z3_mk_fpa_is_positive(a.ctx_ref(), a.as_ast()), a.ctx) 
-    
+
 def _check_fp_args(a, b):
     if __debug__:
         _z3_assert(is_fp(a) or is_fp(b), "At least one of the arguments must be a Z3 floating-point expression")
