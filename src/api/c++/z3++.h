@@ -128,11 +128,20 @@ namespace z3 {
             Z3_set_error_handler(m_ctx, error_handler);
             Z3_set_ast_print_mode(m_ctx, Z3_PRINT_SMTLIB2_COMPLIANT);
         }
+
+        void init_interp(config & c) {
+            m_ctx = Z3_mk_interpolation_context(c);
+            Z3_set_error_handler(m_ctx, error_handler);
+            Z3_set_ast_print_mode(m_ctx, Z3_PRINT_SMTLIB2_COMPLIANT);
+        }
+
         context(context const & s);
         context & operator=(context const & s);
     public:
+        struct interpolation {};
         context() { config c; init(c); }
         context(config & c) { init(c); }
+	context(config & c, interpolation) { init_interp(c); }
         ~context() { Z3_del_context(m_ctx); }
         operator Z3_context() const { return m_ctx; }
 
@@ -142,7 +151,7 @@ namespace z3 {
         void check_error() const {
             Z3_error_code e = Z3_get_error_code(m_ctx);
             if (e != Z3_OK)
-                throw exception(Z3_get_error_msg_ex(m_ctx, e));
+                throw exception(Z3_get_error_msg(m_ctx, e));
         }
 
         /**

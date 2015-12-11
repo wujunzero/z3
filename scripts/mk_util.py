@@ -510,15 +510,11 @@ def dos2unix(fname):
         if is_verbose():
             print("dos2unix '%s'" % fname)
 
-def dos2unix_tree_core(pattern, dir, files):
-    for filename in files:
-        if fnmatch(filename, pattern):
-            fname = os.path.join(dir, filename)
-            if not os.path.isdir(fname):
-                dos2unix(fname)
-
 def dos2unix_tree():
-    os.walk('src', dos2unix_tree_core, '*')
+    for root, dirs, files in os.walk('src'):
+        for f in files:
+            dos2unix(os.path.join(root, f))
+                
 
 def check_eol():
     if not IS_WINDOWS:
@@ -2592,7 +2588,7 @@ def mk_z3consts_py(api_files):
     if Z3PY_SRC_DIR is None:
         raise MKException("You must invoke set_z3py_dir(path):")
 
-    blank_pat      = re.compile("^ *$")
+    blank_pat      = re.compile("^ *\r?$")
     comment_pat    = re.compile("^ *//.*$")
     typedef_pat    = re.compile("typedef enum *")
     typedef2_pat   = re.compile("typedef enum { *")
@@ -2653,6 +2649,8 @@ def mk_z3consts_py(api_files):
                         z3consts.write('%s = %s\n' % (k, i))
                     z3consts.write('\n')
                     mode = SEARCHING
+                elif len(words) <= 2:
+                    assert False, "Invalid %s, line: %s" % (api_file, linenum)
                 else:
                     if words[2] != '':
                         if len(words[2]) > 1 and words[2][1] == 'x':
@@ -2670,7 +2668,7 @@ def mk_z3consts_py(api_files):
 
 # Extract enumeration types from z3_api.h, and add .Net definitions
 def mk_z3consts_dotnet(api_files):
-    blank_pat      = re.compile("^ *$")
+    blank_pat      = re.compile("^ *\r?$")
     comment_pat    = re.compile("^ *//.*$")
     typedef_pat    = re.compile("typedef enum *")
     typedef2_pat   = re.compile("typedef enum { *")
@@ -2740,6 +2738,8 @@ def mk_z3consts_dotnet(api_files):
                             z3consts.write('  %s = %s,\n' % (k, i))
                         z3consts.write('  }\n\n')
                     mode = SEARCHING
+                elif len(words) <= 2:
+                    assert False, "Invalid %s, line: %s" % (api_file, linenum)
                 else:
                     if words[2] != '':
                         if len(words[2]) > 1 and words[2][1] == 'x':

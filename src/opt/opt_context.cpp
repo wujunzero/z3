@@ -167,6 +167,10 @@ namespace opt {
         m_hard_constraints.reset();
     }
 
+    void context::get_labels(svector<symbol> & r) {
+        r.append(m_labels);
+    }
+
     void context::set_hard_constraints(ptr_vector<expr>& fmls) {
         if (m_scoped_state.set(fmls)) {
             clear_state();
@@ -228,6 +232,7 @@ namespace opt {
         TRACE("opt", tout << "initial search result: " << is_sat << "\n";);
         if (is_sat != l_false) {
             s.get_model(m_model);
+            s.get_labels(m_labels);
         }
         if (is_sat != l_true) {
             return is_sat;
@@ -236,27 +241,37 @@ namespace opt {
         TRACE("opt", model_smt2_pp(tout, m, *m_model, 0););
         m_optsmt.setup(*m_opt_solver.get());
         update_lower();
+        
         switch (m_objectives.size()) {
         case 0:
-            return is_sat;
+            break;
         case 1:
-            return execute(m_objectives[0], true, false);
+            is_sat = execute(m_objectives[0], true, false);
+            break;
         default: {
             opt_params optp(m_params);
             symbol pri = optp.priority();
             if (pri == symbol("pareto")) {
-                return execute_pareto();
+                is_sat = execute_pareto();
             }
             else if (pri == symbol("box")) {
-                return execute_box();
+                is_sat = execute_box();
             }
             else {
-                return execute_lex();
+                is_sat = execute_lex();
             }
+            break;
         }
         }
+        return adjust_unknown(is_sat);
     }
 
+    lbool context::adjust_unknown(lbool r) {
+        if (r == l_true && m_opt_solver.get() && m_opt_solver->was_unknown()) {
+            r = l_undef;
+        }
+        return r;
+    }
 
     bool context::print_model() const {
         opt_params optp(m_params);
@@ -276,11 +291,6 @@ namespace opt {
         }
     }
 
-    void context::set_model(model_ref& mdl) {
-        m_model = mdl;
-        fix_model(mdl);
-    }
-
     void context::get_model(model_ref& mdl) {
         mdl = m_model;
         fix_model(mdl);
@@ -289,7 +299,7 @@ namespace opt {
     lbool context::execute_min_max(unsigned index, bool committed, bool scoped, bool is_max) {
         if (scoped) get_solver().push();            
         lbool result = m_optsmt.lex(index, is_max);
-        if (result == l_true) m_optsmt.get_model(m_model);
+        if (result == l_true) m_optsmt.get_model(m_model, m_labels);
         if (scoped) get_solver().pop(1);        
         if (result == l_true && committed) m_optsmt.commit_assignment(index);
         return result;
@@ -300,7 +310,7 @@ namespace opt {
         maxsmt& ms = *m_maxsmts.find(id);
         if (scoped) get_solver().push();            
         lbool result = ms();
-        if (result != l_false && (ms.get_model(tmp), tmp.get())) ms.get_model(m_model);
+        if (result != l_false && (ms.get_model(tmp, m_labels), tmp.get())) ms.get_model(m_model, m_labels);
         if (scoped) get_solver().pop(1);
         if (result == l_true && committed) ms.commit_assignment();
         return result;
@@ -453,7 +463,7 @@ namespace opt {
     }
 
     void context::yield() {
-        m_pareto->get_model(m_model);
+        m_pareto->get_model(m_model, m_labels);
         update_bound(true);
         update_bound(false);
     }
@@ -1121,16 +1131,20 @@ namespace opt {
     }
 
     void context::display_assignment(std::ostream& out) {
+        out << "(objectives\n";
         for (unsigned i = 0; i < m_scoped_state.m_objectives.size(); ++i) {
             objective const& obj = m_scoped_state.m_objectives[i];
+            out << " (";
             display_objective(out, obj);
             if (get_lower_as_num(i) != get_upper_as_num(i)) {
-                out << " |-> [" << get_lower(i) << ":" << get_upper(i) << "]\n";
+                out << "  (" << get_lower(i) << " " << get_upper(i) << ")";
             }
             else {
-                out << " |-> " << get_lower(i) << "\n";
+                out << " " << get_lower(i);
             }
+            out << ")\n";
         }
+        out << ")\n";
     }
 
     void context::display_objective(std::ostream& out, objective const& obj) const {
@@ -1284,7 +1298,7 @@ namespace opt {
         opt_params::collect_param_descrs(r);
     }
     
-    void context::updt_params(params_ref& p) {
+    void context::updt_params(params_ref const& p) {
         m_params.append(p);
         if (m_solver) {
             m_solver->updt_params(m_params);

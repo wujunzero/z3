@@ -162,6 +162,7 @@ namespace opt {
         bool                         m_pp_neat;
         symbol                       m_maxsat_engine;
         symbol                       m_logic;
+        svector<symbol>              m_labels;
     public:
         context(ast_manager& m);
         virtual ~context();
@@ -180,11 +181,10 @@ namespace opt {
         virtual lbool optimize();
         virtual bool print_model() const;
         virtual void get_model(model_ref& _m);
-        virtual void set_model(model_ref& _m);
         virtual void fix_model(model_ref& _m);
         virtual void collect_statistics(statistics& stats) const;
         virtual proof* get_proof() { return 0; }
-        virtual void get_labels(svector<symbol> & r) {}
+        virtual void get_labels(svector<symbol> & r);
         virtual void get_unsat_core(ptr_vector<expr> & r) {}
         virtual std::string reason_unknown() const;
 
@@ -195,7 +195,7 @@ namespace opt {
 
         void display(std::ostream& out);
         static void collect_param_descrs(param_descrs & r);
-        void updt_params(params_ref& p);
+        virtual void updt_params(params_ref const& p);
         params_ref& get_params() { return m_params; }
 
         expr_ref get_lower(unsigned idx);
@@ -229,6 +229,7 @@ namespace opt {
         lbool execute_lex();
         lbool execute_box();
         lbool execute_pareto();
+        lbool adjust_unknown(lbool r);
         bool scoped_lex();
         expr_ref to_expr(inf_eps const& n);
 

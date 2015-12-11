@@ -2277,60 +2277,48 @@ void fpa2bv_converter::mk_to_fp_float(func_decl * f, sort * s, expr * rm, expr *
             res_exp = m_bv_util.mk_bv_sub(res_exp, lz_ext);
         }
         else if (from_ebits > (to_ebits + 2)) {
-            expr_ref lz_rest(m), lz_redor(m), lz_redor_bool(m);
-            lz_rest = m_bv_util.mk_extract(from_ebits - 1, to_ebits + 2, lz);
-            lz_redor = m.mk_app(m_bv_util.get_fid(), OP_BREDOR, lz_rest.get());
-            m_simp.mk_eq(lz_redor, one1, lz_redor_bool);
-            dbg_decouple("fpa2bv_to_float_exp_lz_redor", lz_redor);
+			unsigned ebits_diff = from_ebits - (to_ebits + 2);
 
             // subtract lz for subnormal numbers.
             expr_ref exp_sub_lz(m);
-            exp_sub_lz = m_bv_util.mk_bv_sub(exp, lz);
+            exp_sub_lz = m_bv_util.mk_bv_sub(m_bv_util.mk_sign_extend(2, exp), m_bv_util.mk_sign_extend(2, lz));
             dbg_decouple("fpa2bv_to_float_exp_sub_lz", exp_sub_lz);
 
-            expr_ref high(m), low(m), low_msb(m);
-            expr_ref no_ovf(m), zero1(m);
-            high = m_bv_util.mk_extract(from_ebits - 1, to_ebits + 2, exp_sub_lz);
-            low = m_bv_util.mk_extract(to_ebits + 1, 0, exp_sub_lz);
-            low_msb = m_bv_util.mk_extract(to_ebits + 1, to_ebits + 1, low);
-            dbg_decouple("fpa2bv_to_float_exp_high", high);
-            dbg_decouple("fpa2bv_to_float_exp_low", low);
-            dbg_decouple("fpa2bv_to_float_exp_low_msb", low_msb);
+			// check whether exponent is within roundable (to_ebits+2) range.
+			expr_ref max_exp(m), min_exp(m), exp_in_range(m);
+            const mpz & z = m_mpf_manager.m_powers2(to_ebits + 1, true);
+            max_exp = m_bv_util.mk_concat(
+                m_bv_util.mk_numeral(m_mpf_manager.m_powers2.m1(to_ebits, false), to_ebits + 1),
+                m_bv_util.mk_numeral(0, 1));
+            min_exp = m_bv_util.mk_numeral(z + mpz(2), to_ebits+2);
+            dbg_decouple("fpa2bv_to_float_max_exp", max_exp);
+            dbg_decouple("fpa2bv_to_float_min_exp", min_exp);
 
-            res_exp = low;
+            expr_ref first_ovf_exp(m), first_udf_exp(m);
+            const mpz & ovft = m_mpf_manager.m_powers2.m1(to_ebits+1, false);
+            first_ovf_exp = m_bv_util.mk_numeral(ovft, from_ebits+2);
+            first_udf_exp = m_bv_util.mk_concat(
+                                m_bv_util.mk_numeral(-1, ebits_diff + 3),
+                                m_bv_util.mk_numeral(1, to_ebits + 1));
+            dbg_decouple("fpa2bv_to_float_first_ovf_exp", first_ovf_exp);
+            dbg_decouple("fpa2bv_to_float_first_udf_exp", first_udf_exp);
 
-            expr_ref high_red_or(m), high_red_and(m);
-            high_red_or = m.mk_app(m_bv_util.get_fid(), OP_BREDOR, high.get());
-            high_red_and = m.mk_app(m_bv_util.get_fid(), OP_BREDAND, high.get());
+			exp_in_range = m_bv_util.mk_extract(to_ebits + 1, 0, exp_sub_lz);
+			SASSERT(m_bv_util.get_bv_size(exp_in_range) == to_ebits + 2);
 
-            expr_ref h_or_eq_0(m), h_and_eq_1(m), low_msb_is_one(m), low_msb_is_zero(m);
-            zero1 = m_bv_util.mk_numeral(0, 1);
-            m_simp.mk_eq(high_red_and, one1, h_and_eq_1);
-            m_simp.mk_eq(high_red_or, zero1, h_or_eq_0);
-            m_simp.mk_eq(low_msb, zero1, low_msb_is_zero);
-            m_simp.mk_eq(low_msb, one1, low_msb_is_one);
-            dbg_decouple("fpa2bv_to_float_exp_h_and_eq_1", h_and_eq_1);
-            dbg_decouple("fpa2bv_to_float_exp_h_or_eq_0", h_or_eq_0);
-            dbg_decouple("fpa2bv_to_float_exp_s_is_zero", low_msb_is_zero);
-            dbg_decouple("fpa2bv_to_float_exp_s_is_one", low_msb_is_one);
+			expr_ref ovf_cond(m), udf_cond(m);
+			ovf_cond = m_bv_util.mk_sle(first_ovf_exp, exp_sub_lz);
+			udf_cond = m_bv_util.mk_sle(exp_sub_lz, first_udf_exp);
+            dbg_decouple("fpa2bv_to_float_exp_ovf", ovf_cond);
+            dbg_decouple("fpa2bv_to_float_exp_udf", udf_cond);
 
-            m_simp.mk_and(h_or_eq_0, low_msb_is_one, exponent_underflow);
-            m_simp.mk_and(h_and_eq_1, low_msb_is_zero, exponent_overflow);
-            m_simp.mk_or(exponent_overflow, lz_redor_bool, exponent_overflow);
-            dbg_decouple("fpa2bv_to_float_exp_ovf", exponent_overflow);
-            dbg_decouple("fpa2bv_to_float_exp_udf", exponent_underflow);
-
-            // exponent underflow means that the result is the smallest
-            // representable float, rounded according to rm.
-            m_simp.mk_ite(exponent_underflow,
-                                m_bv_util.mk_concat(m_bv_util.mk_numeral(1, 1),
-                                                    m_bv_util.mk_numeral(1, to_ebits+1)),
-                                res_exp,
-                                res_exp);
-            m_simp.mk_ite(exponent_underflow, m_bv_util.mk_numeral(1, to_sbits+4), res_sig, res_sig);
+			res_exp = exp_in_range;
+			res_exp = m.mk_ite(ovf_cond, max_exp, res_exp);
+			res_exp = m.mk_ite(udf_cond, min_exp, res_exp);
         }
-        else // from_ebits == (to_ebits + 2)
+        else { // from_ebits == (to_ebits + 2)
             res_exp = m_bv_util.mk_bv_sub(exp, lz);
+        }
 
         SASSERT(m_bv_util.get_bv_size(res_exp) == to_ebits + 2);
         SASSERT(is_well_sorted(m, res_exp));
